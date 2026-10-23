@@ -1,0 +1,67 @@
+# =============================================================================
+# Integrity Autocars — Apache config for cPanel (LiteSpeed/Apache compatible)
+# =============================================================================
+
+# --- Force HTTPS (Let's Encrypt / AutoSSL) ------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# --- Protect app internals -----------------------------------------------------
+<FilesMatch "^\.env">
+  Require all denied
+</FilesMatch>
+
+# --- Pretty URLs: everything that is not a real file/dir goes to index.php -----
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+# --- Security headers ----------------------------------------------------------
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  # Ignored over plain HTTP; arms automatically once HTTPS is active.
+  Header always set Strict-Transport-Security "max-age=31536000"
+  # Must stay in sync with the CSP emitted in app/bootstrap.php
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+</IfModule>
+
+# --- Compression: ship HTML/CSS/JS/XML/JSON/SVG gzipped ------------------------
+# LiteSpeed and most cPanel hosts support deflate; wrapped in IfModule so the
+# site keeps working on hosts without it. Static files below are ALSO cached
+# (see the mod_expires block) — compression + caching are complementary.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml \
+    application/javascript application/json application/xml image/svg+xml
+</IfModule>
+
+# --- Caching for static assets -------------------------------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/webp  "access plus 30 days"
+  ExpiresByType image/jpeg  "access plus 30 days"
+  ExpiresByType image/png   "access plus 30 days"
+  ExpiresByType text/css    "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+</IfModule>
+
+# --- PHP limits (verify on the hosting account: cPanel → MultiPHP INI Editor) --
+# upload_max_filesize = 10M
+# post_max_size = 15M
+# max_execution_time = 120
+# memory_limit = 256M
+<IfModule lsapi_module>
+  php_value upload_max_filesize 10M
+  php_value post_max_size 15M
+</IfModule>
+
+Options -Indexes
